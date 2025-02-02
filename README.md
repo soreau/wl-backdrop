@@ -38,3 +38,8 @@ To change this, you are free to modify the code.
 The location and api key are acquired from AccuWeather. This starts the application on `WAYLAND_DISPLAY` socket `wayland-1` with an update interval of 45 minutes and temperature in celsius:
 
 `WAYLAND_DISPLAY=wayland-1 python backdrop.py -l XXXXXXX -k XXXXXXX -i 45 -m`
+
+# Screenshot
+
+![backdrop](https://github.com/user-attachments/assets/4a2eee66-af39-4de5-ba5c-9f868341a001)
+
