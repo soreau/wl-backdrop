@@ -53,10 +53,39 @@ def close(backdrop):
     backdrop["thread"].join()
     exit(0)
 
+def create_buffer(backdrop, width, height):
+    anon_file = AnonymousFile(width * height * 4)
+    anon_file.open()
+    fd = anon_file.fd
+    data = mmap.mmap(fileno=fd, length=width * height * 4, access=mmap.ACCESS_WRITE, offset=0)
+    pool = backdrop["shm_binding"].create_pool(fd, width * height * 4)
+    backdrop["buffer_id"] = 1
+    if "buffer1" in backdrop:
+        backdrop["buffer1"].destroy()
+    backdrop["buffer1"] = pool.create_buffer(0, width, height, width * 4, WlShm.format.argb8888)
+    pool.destroy()
+    anon_file.close()
+
+    backdrop["shm_data"] = data
+    backdrop["cairo_surface"] = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+
 def handle_xdg_surface_configure(xdg_surface, serial):
     backdrop = xdg_surface.user_data
     backdrop["wait_for_configure"] = False
     backdrop["xdg_surface"].ack_configure(serial)
+    backdrop["surface"].commit()
+    backdrop["display"].flush()
+
+def handle_xdg_toplevel_configure(xdg_toplevel, width, height, flags):
+    global window_width, window_height
+    backdrop = xdg_toplevel.user_data
+    if backdrop["wait_for_configure"]:
+        return
+    if width != 0 and height != 0 and window_width != width and window_height != height:
+        window_width = width
+        window_height = height
+        create_buffer(backdrop, width, height)
+        redraw(backdrop)
 
 def handle_xdg_surface_close(xdg_toplevel):
     close(xdg_toplevel.user_data)
@@ -79,7 +108,6 @@ def redraw(backdrop):
     formatted_time = current_time.strftime("%l:%M:%S")
 
     cr = cairo.Context(backdrop["cairo_surface"])
-
     center_x = window_width / 2
     center_y = window_height / 2
     radius = window_height / 3
@@ -92,15 +120,18 @@ def redraw(backdrop):
 
     cr.set_operator(cairo.OPERATOR_SOURCE)
 
-    # Draw semi-transparent background
-    cr.set_source_rgba(0.25, 0.25, 0.25, 0.25)
+    # Draw semi-transparent background with gradient
+    grad = cairo.LinearGradient(window_width / 2.0, 0, window_width / 2.0, window_height)
+    grad.add_color_stop_rgba(0.0, 0.25, 0.25, 0.25, 0.0)
+    grad.add_color_stop_rgba(1.0, 0.25, 0.25, 0.25, 0.75)
+    cr.set_source(grad)
     cr.rectangle(0, 0, window_width, window_height)
     cr.fill()
 
     # Draw current time
     cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
     cr.set_font_size(window_width / 7)
-    cr.set_source_rgba(1, 1, 1, 1)
+    cr.set_source_rgba(1, 1, 1, 0.75)
     cr.move_to(window_width * 0.42, window_height * 0.75)
     cr.show_text(formatted_time)
 
@@ -181,28 +212,18 @@ def backdrop_create():
 
     backdrop["surface"] = backdrop["compositor_binding"].create_surface()
     backdrop["xdg_surface"] = backdrop["xdg_binding"].get_xdg_surface(backdrop["surface"])
-    backdrop["xdg_toplevel"] = backdrop["xdg_surface"].get_toplevel()
     backdrop["xdg_surface"].user_data = backdrop
     backdrop["xdg_surface"].dispatcher["configure"] = handle_xdg_surface_configure
+    backdrop["xdg_toplevel"] = backdrop["xdg_surface"].get_toplevel()
     backdrop["xdg_toplevel"].user_data = backdrop
+    backdrop["xdg_toplevel"].dispatcher["configure"] = handle_xdg_toplevel_configure
     backdrop["xdg_toplevel"].dispatcher["close"] = handle_xdg_surface_close
     backdrop["xdg_toplevel"].set_title("Backdrop")
     backdrop["xdg_toplevel"].set_app_id("backdrop")
 
     backdrop["surface"].commit()
     backdrop["display"].flush()
-    anon_file = AnonymousFile(window_width * window_height * 4)
-    anon_file.open()
-    fd = anon_file.fd
-    data = mmap.mmap(fileno=fd, length=window_width * window_height * 4, access=mmap.ACCESS_WRITE, offset=0)
-    pool = backdrop["shm_binding"].create_pool(fd, window_width * window_height * 4)
-    backdrop["buffer_id"] = 1
-    backdrop["buffer1"] = pool.create_buffer(0, window_width, window_height, window_width * 4, WlShm.format.argb8888)
-    pool.destroy()
-    anon_file.close()
-
-    backdrop["shm_data"] = data
-    backdrop["cairo_surface"] = cairo.ImageSurface(cairo.FORMAT_ARGB32, window_width, window_height)
+    create_buffer(backdrop, window_width, window_height)
 
     temperature_unit_symbol = "°F"
     if backdrop["weather_metric_units"] is True:
