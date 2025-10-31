@@ -167,13 +167,13 @@ def backdrop_create():
     parser.add_argument("-m", "--metric", action="store_true")
     args = parser.parse_args()
     if args.apikey is None:
-        print("Provide AccuWeather APIKEY with -k or --apikey to enable weather updates.")
+        print("Provide OpenWeatherMap APIKEY with -k or --apikey to enable weather updates.")
     if args.location is None:
-        print("Provide AccuWeather location key with -l or --location to localize weather updates.")
-    backdrop["weather_update_interval"] = "60"
+        print("Provide OpenWeatherMap location with -l or --location to localize weather updates.")
+    backdrop["weather_update_interval"] = "15"
     if args.interval is not None:
-        if int(args.interval) < 30:
-            print("Weather update interval must be greater or equal to 30 minutes.")
+        if int(args.interval) < 1:
+            print("Weather update interval must be greater or equal to 1 minute.")
             exit(-1)
         else:
             backdrop["weather_update_interval"] = args.interval
@@ -233,14 +233,11 @@ def backdrop_create():
     backdrop["weather_icon_directory"] = "weather-icons"
     os.makedirs(backdrop["weather_icon_directory"], exist_ok=True)
 
-    weather_icon_number = 7
-
-    padded_number = str(weather_icon_number).zfill(2)
-    weather_icon_name = padded_number + "-s.png"
+    weather_icon_name = "10n.png"
     weather_icon_path = backdrop["weather_icon_directory"] + "/" + weather_icon_name
 
     if not os.path.exists(weather_icon_path):
-        weather_icon_url = "https://developer.accuweather.com/sites/default/files/" + weather_icon_name
+        weather_icon_url = "https://openweathermap.org/img/wn/" + weather_icon_name
         img_data = requests.get(weather_icon_url).content
         with open(weather_icon_path, 'wb') as weather_icon:
             weather_icon.write(img_data)
@@ -266,30 +263,32 @@ def update_time_info():
 
 def update_weather_info():
     if backdrop["weather_api_key"] is None:
-        print("Set AccuWeather api key to enable weather updates.")
+        print("Set OpenWeatherMap api key to enable weather updates.")
         return
     if backdrop["weather_location_key"] is None:
-        print("Set AccuWeather location key to get localized weather updates.")
-        backdrop["weather_location_key"] = "327351"
+        print("Set OpenWeatherMap location to get localized weather updates.")
+        backdrop["weather_location_key"] = "Colorado%20Springs"
 
     current_time = datetime.now().time()
     formatted_time = current_time.strftime("%l:%M:%S")
     print(formatted_time, "- Updating weather information..")
 
     try:
-        weather_data_url = "http://dataservice.accuweather.com/currentconditions/v1/" + str(backdrop["weather_location_key"]) + "?details=True&apikey=" + str(backdrop["weather_api_key"])
-        weather_data = json.loads(requests.get(weather_data_url).content)
-        weather_data = weather_data[0]
         if backdrop["weather_metric_units"] is True:
-            backdrop["weather_temperature"] = str(int(weather_data["Temperature"]["Metric"]["Value"])) + "°C"
+            units = "metric"
         else:
-            backdrop["weather_temperature"] = str(int(weather_data["Temperature"]["Imperial"]["Value"])) + "°F"
-        weather_icon_number = weather_data["WeatherIcon"]
-        padded_number = str(weather_icon_number).zfill(2)
-        weather_icon_name = padded_number + "-s.png"
+            units = "imperial"
+        weather_data_url = "http://api.openweathermap.org/data/2.5/weather?q=" + str(backdrop["weather_location_key"]) + "&units=" + units + "&appid=" + str(backdrop["weather_api_key"])
+        weather_data = json.loads(requests.get(weather_data_url).content)
+        if backdrop["weather_metric_units"] is True:
+            backdrop["weather_temperature"] = str(int(weather_data["main"]["temp"])) + "°C"
+        else:
+            backdrop["weather_temperature"] = str(int(weather_data["main"]["temp"])) + "°F"
+        weather_icon_code = weather_data["weather"]["icon"]
+        weather_icon_name = weather_icon_code + ".png"
         weather_icon_path = backdrop["weather_icon_directory"] + "/" + weather_icon_name
         if not os.path.exists(weather_icon_path):
-            weather_icon_url = "https://developer.accuweather.com/sites/default/files/" + weather_icon_name
+            weather_icon_url = "https://openweathermap.org/img/wn/" + weather_icon_name
             img_data = requests.get(weather_icon_url).content
             with open(weather_icon_path, 'wb') as weather_icon:
                 weather_icon.write(img_data)
@@ -297,7 +296,7 @@ def update_weather_info():
         print("Weather information updated successfully:", backdrop["weather_temperature"])
     except Exception as e:
         print("Failed to update weather:", e)
-        print(weather_data)
+        #print(weather_data)
         pass
 
 def timer_thread():
@@ -322,9 +321,7 @@ def main():
     epoll.register(backdrop["weather_update_fd"], select.EPOLLIN)
     epoll.register(backdrop["time_update_fd"], select.EPOLLIN)
     epoll.register(backdrop["close_fd"], select.EPOLLIN)
-    # Uncomment the following line to update weather data when starting the app
-    # Use with caution during testing as AccuWeather limits requests per period
-    #os.write(backdrop["weather_update_fd"], b"00000000")
+    os.write(backdrop["weather_update_fd"], b"00000000")
     backdrop["running"] = True
     backdrop["thread"] = threading.Thread(target=timer_thread)
     backdrop["thread"].start()
