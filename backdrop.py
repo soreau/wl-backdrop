@@ -144,7 +144,7 @@ def redraw(backdrop):
     # Draw weather icon
     cr.set_operator(cairo.OPERATOR_OVER)
     cr.scale(2, 2)
-    cr.set_source_surface(backdrop["weather_icon_surface"], window_width * 0.14, window_height * 0.17)
+    cr.set_source_surface(backdrop["weather_icon_surface"], window_width * 0.13, window_height * 0.04)
     cr.paint()
 
     # Upload buffer data to be read by the compositor
@@ -233,7 +233,7 @@ def backdrop_create():
     backdrop["weather_icon_directory"] = "weather-icons"
     os.makedirs(backdrop["weather_icon_directory"], exist_ok=True)
 
-    weather_icon_name = "10n.png"
+    weather_icon_name = "10n@2x.png"
     weather_icon_path = backdrop["weather_icon_directory"] + "/" + weather_icon_name
 
     if not os.path.exists(weather_icon_path):
@@ -285,7 +285,7 @@ def update_weather_info():
         else:
             backdrop["weather_temperature"] = str(int(weather_data["main"]["temp"])) + "°F"
         weather_icon_code = weather_data["weather"][0]["icon"]
-        weather_icon_name = weather_icon_code + ".png"
+        weather_icon_name = weather_icon_code + "@2x.png"
         weather_icon_path = backdrop["weather_icon_directory"] + "/" + weather_icon_name
         if not os.path.exists(weather_icon_path):
             weather_icon_url = "https://openweathermap.org/img/wn/" + weather_icon_name
