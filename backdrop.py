@@ -273,31 +273,26 @@ def update_weather_info():
     formatted_time = current_time.strftime("%l:%M:%S")
     print(formatted_time, "- Updating weather information..")
 
-    try:
-        if backdrop["weather_metric_units"] is True:
-            units = "metric"
-        else:
-            units = "imperial"
-        weather_data_url = "http://api.openweathermap.org/data/2.5/weather?q=" + str(backdrop["weather_location_key"]) + "&units=" + units + "&appid=" + str(backdrop["weather_api_key"])
-        weather_data = json.loads(requests.get(weather_data_url).content)
-        if backdrop["weather_metric_units"] is True:
-            backdrop["weather_temperature"] = str(int(weather_data["main"]["temp"])) + "°C"
-        else:
-            backdrop["weather_temperature"] = str(int(weather_data["main"]["temp"])) + "°F"
-        weather_icon_code = weather_data["weather"]["icon"]
-        weather_icon_name = weather_icon_code + ".png"
-        weather_icon_path = backdrop["weather_icon_directory"] + "/" + weather_icon_name
-        if not os.path.exists(weather_icon_path):
-            weather_icon_url = "https://openweathermap.org/img/wn/" + weather_icon_name
-            img_data = requests.get(weather_icon_url).content
-            with open(weather_icon_path, 'wb') as weather_icon:
-                weather_icon.write(img_data)
-        backdrop["weather_icon_surface"] = cairo.ImageSurface.create_from_png(weather_icon_path)
-        print("Weather information updated successfully:", backdrop["weather_temperature"])
-    except Exception as e:
-        print("Failed to update weather:", e)
-        #print(weather_data)
-        pass
+    if backdrop["weather_metric_units"] is True:
+        units = "metric"
+    else:
+        units = "imperial"
+    weather_data_url = "http://api.openweathermap.org/data/2.5/weather?q=" + str(backdrop["weather_location_key"]) + "&units=" + units + "&appid=" + str(backdrop["weather_api_key"])
+    weather_data = json.loads(requests.get(weather_data_url).content)
+    if backdrop["weather_metric_units"] is True:
+        backdrop["weather_temperature"] = str(int(weather_data["main"]["temp"])) + "°C"
+    else:
+        backdrop["weather_temperature"] = str(int(weather_data["main"]["temp"])) + "°F"
+    weather_icon_code = weather_data["weather"][0]["icon"]
+    weather_icon_name = weather_icon_code + ".png"
+    weather_icon_path = backdrop["weather_icon_directory"] + "/" + weather_icon_name
+    if not os.path.exists(weather_icon_path):
+        weather_icon_url = "https://openweathermap.org/img/wn/" + weather_icon_name
+        img_data = requests.get(weather_icon_url).content
+        with open(weather_icon_path, 'wb') as weather_icon:
+            weather_icon.write(img_data)
+    backdrop["weather_icon_surface"] = cairo.ImageSurface.create_from_png(weather_icon_path)
+    print("Weather information updated successfully:", backdrop["weather_temperature"])
 
 def timer_thread():
     i = 0
